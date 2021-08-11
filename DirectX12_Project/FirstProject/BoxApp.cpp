@@ -11,6 +11,7 @@
 #include "d3dApp.h"
 #include "MathHelper.h"
 #include "UploadBuffer.h"
+#include "FirstApp.h"
 
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"D3D12.lib")
@@ -95,7 +96,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
     try
     {
-        BoxApp theApp(hInstance);
+        FirstApp theApp(hInstance);
         if(!theApp.Initialize())
             return 0;
 

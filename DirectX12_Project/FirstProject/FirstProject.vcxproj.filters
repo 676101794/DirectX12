@@ -13,68 +13,80 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="源文件\ProjectFile">
+      <UniqueIdentifier>{62c50886-64fc-4269-9c04-e04cbeb19e0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\ProjectFile">
+      <UniqueIdentifier>{47b81513-afed-49f0-aa6c-5080dbeb50e3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Camera.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="d3dApp.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="d3dUtil.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="DDSTextureLoader.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="GameTimer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="GeometryGenerator.cpp">
+    <ClCompile Include="MyDirectXFunctionLib.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="MathHelper.cpp">
-      <Filter>源文件</Filter>
+      <Filter>源文件\ProjectFile</Filter>
     </ClCompile>
     <ClCompile Include="BoxApp.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="d3dApp.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="d3dUtil.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="DDSTextureLoader.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="GameTimer.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="GeometryGenerator.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="DirectXMathTest.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="MyDirectXFunctionLib.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="d3dApp.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="d3dUtil.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="d3dx12.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="DDSTextureLoader.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="GameTimer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="GeometryGenerator.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="MathHelper.h">
+    <ClInclude Include="MyDirectXFunctionLib.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="UploadBuffer.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\ProjectFile</Filter>
     </ClInclude>
-    <ClInclude Include="MyDirectXFunctionLib.h">
+    <ClInclude Include="MathHelper.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryGenerator.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="GameTimer.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="DDSTextureLoader.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="d3dx12.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="d3dUtil.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="d3dApp.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

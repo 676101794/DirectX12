@@ -26,11 +26,9 @@ std::ostream& XM_CALLCONV operator<<(std::ostream& os, DirectX::XMMATRIX v)
 	return os;
 }
 
-
-
 int main()
 {
-	
+
 	DirectX::XMFLOAT3 vec(1.0f,0.0f,0.0f);
 	DirectX::XMFLOAT3 vec1(0.0f, 0.0f,1.0f);
 

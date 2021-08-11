@@ -1,4 +1,6 @@
 #include "MyDirectXFunctionLib.h"
+#include <dxgi.h>
+#include <vector>
 
 using namespace DirectX;
 float CalculateAngleFromTwoVec(DirectX::XMVECTOR vec1, DirectX::XMVECTOR vec2)
