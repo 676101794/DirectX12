@@ -26,10 +26,12 @@
     <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="DirectXMathTest.cpp" />
     <ClCompile Include="FirstApp.cpp" />
+    <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="GameTimer.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="MyDirectXFunctionLib.cpp" />
+    <ClCompile Include="TextureLoadClassApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -38,10 +40,13 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="FirstApp.h" />
+    <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="MyDirectXFunctionLib.h" />
+    <ClInclude Include="RenderItem.h" />
+    <ClInclude Include="TextureLoadClassApp.h" />
     <ClInclude Include="UploadBuffer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

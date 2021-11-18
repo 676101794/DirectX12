@@ -54,6 +54,12 @@
     <ClCompile Include="DirectXMathTest.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="FrameResource.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureLoadClassApp.cpp">
+      <Filter>源文件\ProjectFile</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MyDirectXFunctionLib.h">
@@ -88,6 +94,15 @@
     </ClInclude>
     <ClInclude Include="FirstApp.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameResource.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderItem.h">
+      <Filter>头文件\ProjectFile</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureLoadClassApp.h">
+      <Filter>头文件\ProjectFile</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
