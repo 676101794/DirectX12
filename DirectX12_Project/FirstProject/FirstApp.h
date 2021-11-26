@@ -1,11 +1,13 @@
 #pragma once
 #include "d3dApp.h"
-#include "MathHelper.h"
-//#include "FrameResource.h"
+#include "FrameResource.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
+class RenderItem;
+
+const int gNumFrameResources = 3;
 
 namespace MyApp
 {
@@ -14,13 +16,7 @@ namespace MyApp
 		XMFLOAT3 Pos;
 		XMFLOAT4 Color;
 	};
-
-	struct VertexColor
-	{
-		XMFLOAT4 Color;
-	};
 }
-
 class FirstApp :public D3DApp
 {
 public:
@@ -34,9 +30,33 @@ private:
 	virtual void Update(const GameTimer& gt) override;
 	virtual void Draw(const GameTimer& gt) override;
 
+	virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
+	virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
+	virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
+
+	void LoadTextures();
+	void BuildDescriptorHeaps();
+	void BuildConstantBufferViews();
+	void BuildConstantBuffers();
+	void BuildRootSignature();
+	void BuildShadersAndInputLayout();
+	void BuildBoxGeometry();
+	void BuildFrameResources();
+	void BuildRenderItems();
+
+	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+
+	//Pipeline State Object
+	void BuildPSO();
+
+	void OnKeyboardInput(const GameTimer& gt);
+	void UpdateCamera(const GameTimer& gt);
+	void UpdateObjectCBs(const GameTimer& gt);
+	void UpdateMainPassCBs(const GameTimer& gt);
+
 private:
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
-	//std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
+	std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
 
 	//纹理
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
@@ -69,7 +89,23 @@ private:
 
 	POINT mLastMousePos;
 
-	const int gNumFrameResources = 3;
-	//std::vector<std::unique_ptr<FrameResource>> mFrameResources;
-};
+	std::vector<std::unique_ptr<FrameResource>> mFrameResources;
 
+	int mCurrFrameResourceIndex = 0;
+	FrameResource* mCurrFrameResource = nullptr;
+
+	bool mIsWireframe = false;
+	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
+	UINT mPassCbvOffset = 0;
+private:
+	//存有所有渲染项的向量
+	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
+
+	//根据PSO来划分渲染项
+	std::vector<RenderItem*> mOpaqueRitems;
+	std::vector<RenderItem*> mTransparentRitems;
+
+	PassConstants mMainPassCB;
+	//test
+	D3D12_VERTEX_BUFFER_VIEW vbv;
+};

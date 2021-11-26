@@ -1,9 +1,9 @@
 #pragma once
 #include <DirectXMath.h>
-#include "../../../47921Resource/BookSource/Common/MathHelper.h"
 #include "d3dUtil.h"
 
 //class MeshGeometry;
+using namespace DirectX;
 
 // 存储绘制图形所需参数的轻量级结构体。它会随着不同的应用程序而有所差别
 struct RenderItem

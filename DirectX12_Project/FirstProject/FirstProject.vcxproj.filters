@@ -27,9 +27,6 @@
     <ClCompile Include="MathHelper.cpp">
       <Filter>源文件\ProjectFile</Filter>
     </ClCompile>
-    <ClCompile Include="BoxApp.cpp">
-      <Filter>源文件\ProjectFile</Filter>
-    </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>源文件\ProjectFile</Filter>
     </ClCompile>
