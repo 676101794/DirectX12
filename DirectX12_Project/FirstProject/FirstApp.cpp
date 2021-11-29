@@ -1,5 +1,6 @@
 #include "FirstApp.h"
 #include "RenderItem.h"
+#include "GeometryGenerator.h"
 //#include <DirectXColors.h>
 
 FirstApp::FirstApp(HINSTANCE hInstance):D3DApp(hInstance)
@@ -116,10 +117,12 @@ void FirstApp::Draw(const GameTimer& gt)
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
-// 	int passCbvIndex = mPassCbvOffset + mCurrFrameResourceIndex;
-// 	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
-// 	passCbvHandle.Offset(passCbvIndex, mCbvSrvUavDescriptorSize);
-// 	mCommandList->SetGraphicsRootDescriptorTable(1, passCbvHandle);
+ 	int passCbvIndex = mPassCbvOffset + mCurrFrameResourceIndex;
+ 	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+ 	passCbvHandle.Offset(passCbvIndex, mCbvSrvUavDescriptorSize);
+ 	mCommandList->SetGraphicsRootDescriptorTable(0, passCbvHandle);
+
+
 	
 	//绘制RenderItems
 	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
@@ -210,6 +213,9 @@ void FirstApp::BuildDescriptorHeaps()
 
 	// 建立描述符堆，描述堆的描述符容量为帧数*（每帧所需要绘制的物体数量+1），+1是因为每帧都还需要绘制一个passCB
 	UINT numDescriptors = (objCount + 1) * gNumFrameResources;
+
+	// 因为会首先建立ObjConstantBuffer，使用同一个描述符堆，PassConstantsBuffer会有一个偏移值。偏移值的量为ObjCount*gNumFrameResource;
+	mPassCbvOffset = objCount * gNumFrameResources;
 	
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
 	cbvHeapDesc.NumDescriptors = numDescriptors;
@@ -231,7 +237,7 @@ void FirstApp::BuildConstantBufferViews()
 	{
 		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
 
-		for(UINT i=0;i<objCount;i++)
+		for(UINT i=0;i<objCount;++i)
 		{
 			//获取到当前帧的常量缓冲区的GPU地址
 			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
@@ -275,25 +281,6 @@ void FirstApp::BuildConstantBufferViews()
 	}
 }
 
-void FirstApp::BuildConstantBuffers()
-{
-	mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), 1, true);
-	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
-
-	// Offset to the ith object constant buffer in the buffer.
-	int boxCBufIndex = 0;
-	cbAddress += boxCBufIndex * objCBByteSize;
-
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-	cbvDesc.BufferLocation = cbAddress;
-	cbvDesc.SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-
-	md3dDevice->CreateConstantBufferView(
-		&cbvDesc,
-		mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
 void FirstApp::BuildRootSignature()
 {
 	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
@@ -303,11 +290,13 @@ void FirstApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE cbvTable;
 
 	//第三个参数为要绑定的寄存器，没有显示地指定则直接为0
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
 
-	//第二个根参数用于描述世界矩阵，根常量 初始化过程中Param1：根参数所需的32位常数的个数， Param2: 寄存器编号
-	slotRootParameter[1].InitAsConstants(16, 1);
+	//用于描述世界矩阵  寄存器绑定为0
+	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
+	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
 
 	// A root signature is an array of root parameters.
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
@@ -349,12 +338,9 @@ void FirstApp::BuildShadersAndInputLayout()
 
 void FirstApp::BuildBoxGeometry()
 {
-	std::vector<MyApp::Vertex> vertices
+	//通过Position和Index进行几何的绘制。
+	std::vector<MyApp::Vertex> SquareVertices
 	{
-// 		MyApp::Vertex{XMFLOAT3(0.0f, +1.0f, 0.0f),XMFLOAT4(Colors::Green)},
-// 		MyApp::Vertex{XMFLOAT3(1.0f, -1.0f, 0.0f),XMFLOAT4(Colors::Green)},
-// 		MyApp::Vertex{XMFLOAT3(-1.0f, -2.0f, 0.0f),XMFLOAT4(Colors::Green)}
-
 		MyApp::Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
 		MyApp::Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
 		MyApp::Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
@@ -366,10 +352,8 @@ void FirstApp::BuildBoxGeometry()
 	};
 
 	//点和颜色
-	std::vector<std::uint16_t> indices
+	std::vector<std::uint16_t> SquareIndices
 	{
-		/*0,1,2*/
-
 		// front face
 		0, 1, 2,
 		0, 2, 3,
@@ -396,23 +380,26 @@ void FirstApp::BuildBoxGeometry()
 
 	};
 
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(MyApp::Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	const UINT vbByteSize = (UINT)SquareVertices.size() * sizeof(MyApp::Vertex);
+	const UINT ibByteSize = (UINT)SquareIndices.size() * sizeof(std::uint16_t);
+
+	UINT BoxVertexOffset = 0;
+	UINT BoxIndexOffset = 0;
 
 	auto geo = std::make_unique<MeshGeometry>();
 	geo->Name = "shapeGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), SquareVertices.data(), vbByteSize);
 
 	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), SquareIndices.data(), ibByteSize);
 
 	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+		mCommandList.Get(), SquareVertices.data(), vbByteSize, geo->VertexBufferUploader);
 
 	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+		mCommandList.Get(), SquareIndices.data(), ibByteSize, geo->IndexBufferUploader);
 
 	//顶点步长，格式等等。
 	geo->VertexByteStride = sizeof(MyApp::Vertex);
@@ -420,12 +407,43 @@ void FirstApp::BuildBoxGeometry()
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	SubmeshGeometry TriangleSubmesh;
-	TriangleSubmesh.IndexCount = (UINT)indices.size();
-	TriangleSubmesh.StartIndexLocation = 0;
-	TriangleSubmesh.BaseVertexLocation = 0;
+	SubmeshGeometry SquareSubMesh;
+	SquareSubMesh.IndexCount = (UINT)SquareIndices.size();
+	SquareSubMesh.StartIndexLocation = BoxVertexOffset;
+	SquareSubMesh.BaseVertexLocation = BoxIndexOffset;
 
-	geo->DrawArgs["Triangle"] = TriangleSubmesh;
+	geo->DrawArgs["Square"] = SquareSubMesh;
+
+	//通过GeometryGenerator创建球形
+// 	GeometryGenerator geoGen;
+// 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
+// 	UINT SphereVertexOffset = BoxVertexOffset + (UINT)sphere.Vertices.size();
+// 	UINT SphereIndexOffset= BoxIndexOffset + (UINT)sphere.Vertices.size();
+// 
+// 	SubmeshGeometry sphereSubmesh;
+// 	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+// 	sphereSubmesh.StartIndexLocation = SphereVertexOffset;
+// 	sphereSubmesh.BaseVertexLocation = SphereIndexOffset;
+// 
+// 	auto totalVertexCount = sphere.Vertices.size() + SquareVertices.size();
+// 	std::vector<MyApp::Vertex> vertices(totalVertexCount);
+// 	UINT k = 0;
+// 	for(size_t i=0;i<SquareVertices.size();i++,k++)
+// 	{
+// 		vertices[k].Pos = SquareVertices[i].Pos;
+// 		vertices[k].Color = XMFLOAT4(DirectX::Colors::ForestGreen);
+// 	}
+// 	for(size_t i=0;i<sphere.Vertices.size();i++,k++)
+// 	{
+// 		vertices[k].Pos = sphere.Vertices[i].Position;
+// 		vertices[k].Color = XMFLOAT4(DirectX::Colors::ForestGreen);
+// 	}
+// 
+// 	std::vector<std::uint16_t> indices;
+// 	indices.insert(SquareIndices.end(),std::begin(SquareIndices),std::end(SquareIndices));
+// 	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+// 
+// 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(MyApp::Vertex);
 
 	mGeometries[geo->Name] = std::move(geo);
 }
@@ -443,14 +461,14 @@ void FirstApp::BuildRenderItems()
 {
 	auto TriangleRitem = std::make_unique<RenderItem>();
 	//存入世界矩阵
-	XMStoreFloat4x4(&TriangleRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
+	XMStoreFloat4x4(&TriangleRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
 
 	TriangleRitem->ObjCBIndex = 0;
 	TriangleRitem->Geo = mGeometries["shapeGeo"].get();
 	TriangleRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	TriangleRitem->IndexCount = TriangleRitem->Geo->DrawArgs["Triangle"].IndexCount;
-	TriangleRitem->StartIndexLocation = TriangleRitem->Geo->DrawArgs["Triangle"].StartIndexLocation;
-	TriangleRitem->BaseVertexLocation = TriangleRitem->Geo->DrawArgs["Triangle"].BaseVertexLocation;
+	TriangleRitem->IndexCount = TriangleRitem->Geo->DrawArgs["Square"].IndexCount;
+	TriangleRitem->StartIndexLocation = TriangleRitem->Geo->DrawArgs["Square"].StartIndexLocation;
+	TriangleRitem->BaseVertexLocation = TriangleRitem->Geo->DrawArgs["Square"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(TriangleRitem));
 
 	// All the render items are opaque.
@@ -472,7 +490,6 @@ void FirstApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 		auto ri = ritems[i];
 
 		cmdList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
-		//cmdList->IASetVertexBuffers(0, 1, &vbv);
 		cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
@@ -481,8 +498,8 @@ void FirstApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 		auto cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
 		cbvHandle.Offset(cbvIndex, mCbvSrvUavDescriptorSize);
 
-		//设置根描述符表
-		cmdList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+		//给根描述符的参数进行赋值填充
+		cmdList->SetGraphicsRootDescriptorTable(1, cbvHandle);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
@@ -563,7 +580,7 @@ void FirstApp::UpdateObjectCBs(const GameTimer& gt)
 			//根据每个RenderItem的物体常量缓冲区的偏移Index，将数据拷贝到对应区域里面去。
 			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
 
-			//当前对象当前帧已经进行世界矩阵的拷贝。
+			//当前对象当前帧已经进行世界矩阵的拷贝。暂时每帧都进行拷贝
 			e->NumFramesDirty--;
 		}
 	}
@@ -571,53 +588,54 @@ void FirstApp::UpdateObjectCBs(const GameTimer& gt)
 
 void FirstApp::UpdateMainPassCBs(const GameTimer& gt)
 {
-	XMMATRIX view = XMLoadFloat4x4(&mView);
-	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-
-	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
-	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
-	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
-	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
-
-	XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
-	XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
-	XMStoreFloat4x4(&mMainPassCB.Proj, XMMatrixTranspose(proj));
-	XMStoreFloat4x4(&mMainPassCB.InvProj, XMMatrixTranspose(invProj));
-	XMStoreFloat4x4(&mMainPassCB.ViewProj, XMMatrixTranspose(viewProj));
-	XMStoreFloat4x4(&mMainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
-	mMainPassCB.EyePosW = mEyePos;
-	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
-	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
-	mMainPassCB.NearZ = 1.0f;
-	mMainPassCB.FarZ = 1000.0f;
-	mMainPassCB.TotalTime = gt.TotalTime();
-	mMainPassCB.DeltaTime = gt.DeltaTime();
-
-	auto currPassCB = mCurrFrameResource->PassCB.get();
-	currPassCB->CopyData(0, mMainPassCB);
-
-// 	// Convert Spherical to Cartesian coordinates.
-// 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
-// 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
-// 	float y = mRadius * cosf(mPhi);
-// 
-// 	// Build the view matrix.
-// 	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
-// 	XMVECTOR target = XMVectorZero();
-// 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-// 
-// 	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-// 	XMStoreFloat4x4(&mView, view);
-// 
-// 	XMMATRIX world = XMLoadFloat4x4(&mWorld);
+// 	XMMATRIX view = XMLoadFloat4x4(&mView);
 // 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-// 	XMMATRIX worldViewProj = world * view * proj;
 // 
-// 	// Update the constant buffer with the latest worldViewProj matrix.
-// 	XMStoreFloat4x4(&mMainPassCB.WorldViewProj, XMMatrixTranspose(worldViewProj));
+// 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+// 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+// 	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
+// 	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
+// 
+// 	XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
+// 	XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
+// 	XMStoreFloat4x4(&mMainPassCB.Proj, XMMatrixTranspose(proj));
+// 	XMStoreFloat4x4(&mMainPassCB.InvProj, XMMatrixTranspose(invProj));
+// 	XMStoreFloat4x4(&mMainPassCB.ViewProj, XMMatrixTranspose(viewProj));
+// 	XMStoreFloat4x4(&mMainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
+// 	mMainPassCB.EyePosW = mEyePos;
+// 	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
+// 	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+// 	mMainPassCB.NearZ = 1.0f;
+// 	mMainPassCB.FarZ = 1000.0f;
+// 	mMainPassCB.TotalTime = gt.TotalTime();
+// 	mMainPassCB.DeltaTime = gt.DeltaTime();
 // 
 // 	auto currPassCB = mCurrFrameResource->PassCB.get();
 // 	currPassCB->CopyData(0, mMainPassCB);
+
+	// Convert Spherical to Cartesian coordinates.
+	float x = mRadius * sinf(mPhi) * cosf(mTheta);
+	float z = mRadius * sinf(mPhi) * sinf(mTheta);
+	float y = mRadius * cosf(mPhi);
+
+	// Build the view matrix.
+	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
+	XMVECTOR target = XMVectorZero();
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+	XMStoreFloat4x4(&mView, view);
+
+	XMMATRIX world = XMLoadFloat4x4(&mWorld);
+	XMMATRIX proj = XMLoadFloat4x4(&mProj);
+	XMMATRIX worldViewProj = world * view * proj;
+
+	// Update the constant buffer with the latest worldViewProj matrix.
+	XMStoreFloat4x4(&mMainPassCB.WorldViewProj, XMMatrixTranspose(worldViewProj));
+	mMainPassCB.gTimer = gt.TotalTime();
+
+	auto currPassCB = mCurrFrameResource->PassCB.get();
+	currPassCB->CopyData(0, mMainPassCB);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,

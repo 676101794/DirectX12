@@ -37,7 +37,6 @@ private:
 	void LoadTextures();
 	void BuildDescriptorHeaps();
 	void BuildConstantBufferViews();
-	void BuildConstantBuffers();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildBoxGeometry();

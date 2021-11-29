@@ -5,11 +5,16 @@
 //***************************************************************************************
 
 //单行注释：ctrl+/ 
-//多行注释：alt+shit+A
+//多行注释：alt+shift+A
 
-cbuffer cbPassObject : register(b0)
+cbuffer cbPerObject : register(b0)
 {
-	float4x4 gView;
+	float4x4 gWorld;
+};
+
+cbuffer cbPassObject : register(b1)
+{
+/* 	float4x4 gView;
     float4x4 gInvView;
     float4x4 gProj;
     float4x4 gInvProj;
@@ -22,13 +27,13 @@ cbuffer cbPassObject : register(b0)
     float gNearZ;
     float gFarZ;
     float gTotalTime;
-    float gDeltaTime;
+    float gDeltaTime; */
+
+    float4x4 gViewProj;
+    float4 gPulseColor;
+    float gTime;
 }
 
-cbuffer cbPerObject : register(b1)
-{
-	float4x4 gWorld;
-};
 
 struct VertexIn
 {
@@ -50,7 +55,10 @@ VertexOut VS(VertexIn vin)
   	//vin.PosL.z *= 0.6f + 0.4f*sin(2.0f*gTime);
 	
 	// Transform to homogeneous clip space.
-    float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+    float4 curPos=float4(vin.PosL, 1.0f);
+    
+    //为啥这个gWorld没有值
+    float4 posW = mul(curPos, gWorld);
     vout.PosH = mul(posW, gViewProj);
 	
     //vout.PosH =float4(vin.PosL, 1.0f);
@@ -71,6 +79,16 @@ float4 PS(VertexOut pin) : SV_Target
 	// // 基于参数s 在pin.Color与gPulseColor之间进行线性插值
 	// float4 c = lerp(pin.Color, gPulseColor, s);
 
-	return pin.Color;
+    //return pin.Color;
 	//return c;
+
+    const float pi = 3.14159;
+
+     // 随着时间流逝，令正弦函数的值在[0,1]区间内周期性地变化
+    float s = 0.5f*sin(2*gTime - 0.25f*pi)+0.5f;
+
+     // 基于参数s 在pin.Color与gPulseColor之间进行线性插值
+    float4 c = lerp(pin.Color, gPulseColor, s);
+
+    return c;
 }
