@@ -35,4 +35,6 @@ protected:
 
 	virtual void OnKeyboardInput(const GameTimer& gt) override;
 
+	virtual void BuildRootSignature() override;
+
 };

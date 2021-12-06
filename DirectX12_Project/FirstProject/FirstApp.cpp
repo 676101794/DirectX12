@@ -218,7 +218,9 @@ void FirstApp::BuildDescriptorHeaps()
 	UINT numDescriptors = (objCount + 1) * gNumFrameResources;
 
 	// 因为会首先建立ObjConstantBuffer，使用同一个描述符堆，PassConstantsBuffer会有一个偏移值。偏移值的量为ObjCount*gNumFrameResource;
+	// 然后再建立
 	mPassCbvOffset = objCount * gNumFrameResources;
+	mMaterialCbvOffset = mPassCbvOffset + 1;
 	
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
 	cbvHeapDesc.NumDescriptors = numDescriptors;
@@ -231,6 +233,8 @@ void FirstApp::BuildDescriptorHeaps()
 
 void FirstApp::BuildConstantBufferViews()
 {
+	//创建描述符  PassCB的描述符 ObjectCB的描述符 MaterialCB的描述符
+
 	//根据多少帧，以及每帧需要绘制的物体，来创建描述符！
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
@@ -281,6 +285,15 @@ void FirstApp::BuildConstantBufferViews()
 		cbvDesc.SizeInBytes = passCBByteSize;
 
 		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+	}
+
+	//计算MaterialCB的大小
+	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+	for(int frameIndex=0;frameIndex<gNumFrameResources;frameIndex++)
+	{
+		auto materialCB = mFrameResources[frameIndex]->MaterialCB->Resource();
+
+
 	}
 }
 
@@ -689,31 +702,6 @@ void FirstApp::UpdateObjectCBs(const GameTimer& gt)
 
 void FirstApp::UpdateMainPassCBs(const GameTimer& gt)
 {
-// 	XMMATRIX view = XMLoadFloat4x4(&mView);
-// 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-// 
-// 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
-// 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
-// 	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
-// 	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
-// 
-// 	XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
-// 	XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
-// 	XMStoreFloat4x4(&mMainPassCB.Proj, XMMatrixTranspose(proj));
-// 	XMStoreFloat4x4(&mMainPassCB.InvProj, XMMatrixTranspose(invProj));
-// 	XMStoreFloat4x4(&mMainPassCB.ViewProj, XMMatrixTranspose(viewProj));
-// 	XMStoreFloat4x4(&mMainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
-// 	mMainPassCB.EyePosW = mEyePos;
-// 	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
-// 	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
-// 	mMainPassCB.NearZ = 1.0f;
-// 	mMainPassCB.FarZ = 1000.0f;
-// 	mMainPassCB.TotalTime = gt.TotalTime();
-// 	mMainPassCB.DeltaTime = gt.DeltaTime();
-// 
-// 	auto currPassCB = mCurrFrameResource->PassCB.get();
-// 	currPassCB->CopyData(0, mMainPassCB);
-
 	// Convert Spherical to Cartesian coordinates.
 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
 	float z = mRadius * sinf(mPhi) * sinf(mTheta);

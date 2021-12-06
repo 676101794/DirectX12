@@ -40,11 +40,11 @@ protected:
 	virtual void BuildFrameResources();
 	virtual void BuildRenderItems();
 	virtual void BuildSkullGeometry();
+	virtual void BuildRootSignature();
 
 	void LoadTextures();
 	void BuildDescriptorHeaps();
 	void BuildConstantBufferViews();
-	void BuildRootSignature();
 	void BuildBoxGeometry();
 
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
@@ -84,6 +84,7 @@ protected:
 	std::vector<std::unique_ptr<FrameResource>> mFrameResources;
 
 	UINT mPassCbvOffset = 0;
+	UINT mMaterialCbvOffset = 0;
 
 	//存有所有渲染项的向量
 	std::vector<std::unique_ptr<RenderItem>> mAllRitems;

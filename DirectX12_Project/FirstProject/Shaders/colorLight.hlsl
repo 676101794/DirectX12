@@ -208,6 +208,14 @@ cbuffer cbPassObject : register(b1)
     float gTime;
 }
 
+cbuffer cbMaterial : register(b2)
+{
+	float4 gDiffuseAlbedo;
+    float3 gFresnelR0;
+    float  gRoughness;
+	float4x4 gMatTransform;
+};
+
 struct VertexIn
 {
 	float3 PosL  : POSITION;
