@@ -28,6 +28,7 @@
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="GameTimer.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
+    <ClCompile Include="LightApp.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="MyDirectXFunctionLib.cpp" />
     <ClCompile Include="TextureLoadClassApp.cpp" />
@@ -42,6 +43,7 @@
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="LightApp.h" />
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="MyDirectXFunctionLib.h" />
     <ClInclude Include="RenderItem.h" />

@@ -85,10 +85,10 @@ float4 PS(VertexOut pin) : SV_Target
     const float pi = 3.14159;
 
      // 随着时间流逝，令正弦函数的值在[0,1]区间内周期性地变化
-    float s = 0.5f*sin(2*gTime - 0.25f*pi)+0.5f;
+    //float s = 0.5f*sin(2*gTime - 0.25f*pi)+0.5f;
 
      // 基于参数s 在pin.Color与gPulseColor之间进行线性插值
-    float4 c = lerp(pin.Color, gPulseColor, s);
+    //float4 c = lerp(pin.Color, gPulseColor, s);
 
-    return c;
+    return pin.Color;
 }

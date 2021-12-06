@@ -1,7 +1,11 @@
 #include "FirstApp.h"
 #include "RenderItem.h"
 #include "GeometryGenerator.h"
+#include "LightApp.h"
 //#include <DirectXColors.h>
+
+//这儿为啥放在.h文件会出问题。
+extern const int gNumFrameResources = 3;
 
 FirstApp::FirstApp(HINSTANCE hInstance):D3DApp(hInstance)
 {
@@ -27,6 +31,7 @@ bool FirstApp::Initialize()
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildBoxGeometry();
+	BuildSkullGeometry();
 	BuildRenderItems();
 	BuildFrameResources();
 	BuildDescriptorHeaps();
@@ -122,8 +127,6 @@ void FirstApp::Draw(const GameTimer& gt)
  	passCbvHandle.Offset(passCbvIndex, mCbvSrvUavDescriptorSize);
  	mCommandList->SetGraphicsRootDescriptorTable(0, passCbvHandle);
 
-
-	
 	//绘制RenderItems
 	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
 
@@ -380,72 +383,146 @@ void FirstApp::BuildBoxGeometry()
 
 	};
 
-	const UINT vbByteSize = (UINT)SquareVertices.size() * sizeof(MyApp::Vertex);
-	const UINT ibByteSize = (UINT)SquareIndices.size() * sizeof(std::uint16_t);
+	UINT SquareVertexOffset = 0;
+	UINT SquareIndexOffset = 0;
 
-	UINT BoxVertexOffset = 0;
-	UINT BoxIndexOffset = 0;
+	//顶点步长，格式等等。
+	SubmeshGeometry SquareSubMesh;
+	SquareSubMesh.IndexCount = (UINT)SquareIndices.size();
+	SquareSubMesh.StartIndexLocation = SquareVertexOffset;
+	SquareSubMesh.BaseVertexLocation = SquareIndexOffset;
+
+	//通过GeometryGenerator创建球形
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);//geoGen.CreateSphere(50.0f, 20, 20);
+	UINT SphereVertexOffset = SquareVertexOffset + (UINT)SquareVertices.size();
+	UINT SphereIndexOffset= SquareIndexOffset + (UINT)SquareIndices.size();
+
+	SubmeshGeometry SphereSubmesh;
+	SphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+	SphereSubmesh.StartIndexLocation = SphereIndexOffset;
+	SphereSubmesh.BaseVertexLocation = SphereVertexOffset;
+
+	auto totalVertexCount = sphere.Vertices.size() + SquareVertices.size();
+	std::vector<MyApp::Vertex> vertices(totalVertexCount);
+	UINT k = 0;
+	for(size_t i=0;i<SquareVertices.size();i++,k++)
+	{
+		vertices[k].Pos = SquareVertices[i].Pos;
+		vertices[k].Color = SquareVertices[i].Color;
+	}
+	for(size_t i=0;i<sphere.Vertices.size();i++,k++)
+	{
+		vertices[k].Pos = sphere.Vertices[i].Position;
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Green);
+	}
+
+	std::vector<std::uint16_t> indices;
+	indices.insert(indices.end(),std::begin(SquareIndices),std::end(SquareIndices));
+	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(MyApp::Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
 	auto geo = std::make_unique<MeshGeometry>();
 	geo->Name = "shapeGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), SquareVertices.data(), vbByteSize);
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
 
 	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), SquareIndices.data(), ibByteSize);
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
 	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), SquareVertices.data(), vbByteSize, geo->VertexBufferUploader);
+		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
 
 	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), SquareIndices.data(), ibByteSize, geo->IndexBufferUploader);
+		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
 
-	//顶点步长，格式等等。
-	geo->VertexByteStride = sizeof(MyApp::Vertex);
 	geo->VertexBufferByteSize = vbByteSize;
+	geo->VertexByteStride = sizeof(MyApp::Vertex);
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	SubmeshGeometry SquareSubMesh;
-	SquareSubMesh.IndexCount = (UINT)SquareIndices.size();
-	SquareSubMesh.StartIndexLocation = BoxVertexOffset;
-	SquareSubMesh.BaseVertexLocation = BoxIndexOffset;
-
 	geo->DrawArgs["Square"] = SquareSubMesh;
-
-	//通过GeometryGenerator创建球形
-// 	GeometryGenerator geoGen;
-// 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
-// 	UINT SphereVertexOffset = BoxVertexOffset + (UINT)sphere.Vertices.size();
-// 	UINT SphereIndexOffset= BoxIndexOffset + (UINT)sphere.Vertices.size();
-// 
-// 	SubmeshGeometry sphereSubmesh;
-// 	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
-// 	sphereSubmesh.StartIndexLocation = SphereVertexOffset;
-// 	sphereSubmesh.BaseVertexLocation = SphereIndexOffset;
-// 
-// 	auto totalVertexCount = sphere.Vertices.size() + SquareVertices.size();
-// 	std::vector<MyApp::Vertex> vertices(totalVertexCount);
-// 	UINT k = 0;
-// 	for(size_t i=0;i<SquareVertices.size();i++,k++)
-// 	{
-// 		vertices[k].Pos = SquareVertices[i].Pos;
-// 		vertices[k].Color = XMFLOAT4(DirectX::Colors::ForestGreen);
-// 	}
-// 	for(size_t i=0;i<sphere.Vertices.size();i++,k++)
-// 	{
-// 		vertices[k].Pos = sphere.Vertices[i].Position;
-// 		vertices[k].Color = XMFLOAT4(DirectX::Colors::ForestGreen);
-// 	}
-// 
-// 	std::vector<std::uint16_t> indices;
-// 	indices.insert(SquareIndices.end(),std::begin(SquareIndices),std::end(SquareIndices));
-// 	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
-// 
-// 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(MyApp::Vertex);
+	geo->DrawArgs["Sphere"] = SphereSubmesh;
 
 	mGeometries[geo->Name] = std::move(geo);
+}
+
+void FirstApp::BuildSkullGeometry()
+{
+	//加载骷髅头模型
+	std::ifstream fin("Resource/skull.txt");
+
+	if (!fin)
+	{
+		MessageBox(0, L"Resource/skull.txt not found", 0, 0);
+		return;
+	}
+
+	//顶点读写
+	UINT vertexCount = 0;
+	UINT triangleCount = 0;
+	std::string ignore;
+	fin >> ignore >> vertexCount;
+	fin >> ignore >> triangleCount;
+	fin >> ignore >> ignore >> ignore >> ignore;
+
+	std::vector<MyApp::Vertex> vertices(vertexCount);//初始化顶点列表
+	//顶点列表赋值
+	for (UINT i = 0; i < vertexCount; i++)
+	{
+		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;//读取顶点坐标
+		fin >> ignore >> ignore >> ignore;//normal不读取
+		vertices[i].Color = XMFLOAT4(DirectX::Colors::CadetBlue);//设置顶点色
+	}
+
+	fin >> ignore;
+	fin >> ignore;
+	fin >> ignore;
+
+	std::vector<std::int32_t> indices(triangleCount * 3);//初始化索引列表
+	//索引列表赋值
+	for (UINT i = 0; i < triangleCount; i++)
+	{
+		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+	}
+
+	fin.close();//关闭输入流
+
+	const UINT vbByteSize = vertices.size() * sizeof(MyApp::Vertex);//顶点缓存大小
+	const UINT ibByteSize = indices.size() * sizeof(std::int32_t);//索引缓存大小
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "skullGeo";
+
+	//将顶点和索引数据复制到CPU系统内存上
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	//将顶点和索引数据从CPU内存复制到GPU缓存上
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(),  vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(), indices.data(), ibByteSize,  geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(MyApp::Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexBufferByteSize = ibByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R32_UINT;
+
+	//绘制三参数
+	SubmeshGeometry skullSubmesh;
+	skullSubmesh.BaseVertexLocation = 0;
+	skullSubmesh.StartIndexLocation = 0;
+	skullSubmesh.IndexCount = (UINT)indices.size();
+
+	geo->DrawArgs["skull"] = skullSubmesh;
+
+	mGeometries["skullGeo"] = std::move(geo);
 }
 
 void FirstApp::BuildFrameResources()
@@ -459,17 +536,41 @@ void FirstApp::BuildFrameResources()
 
 void FirstApp::BuildRenderItems()
 {
-	auto TriangleRitem = std::make_unique<RenderItem>();
+	auto SquareRitem = std::make_unique<RenderItem>();
 	//存入世界矩阵
-	XMStoreFloat4x4(&TriangleRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+	XMStoreFloat4x4(&SquareRitem->World, XMMatrixScaling(0.1f, 0.1f, 0.1f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+	SquareRitem->ObjCBIndex = 0;
+	SquareRitem->Geo = mGeometries["shapeGeo"].get();
+	SquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SquareRitem->IndexCount = SquareRitem->Geo->DrawArgs["Square"].IndexCount;
+	SquareRitem->StartIndexLocation = SquareRitem->Geo->DrawArgs["Square"].StartIndexLocation;
+	SquareRitem->BaseVertexLocation = SquareRitem->Geo->DrawArgs["Square"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(SquareRitem));
 
-	TriangleRitem->ObjCBIndex = 0;
-	TriangleRitem->Geo = mGeometries["shapeGeo"].get();
-	TriangleRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	TriangleRitem->IndexCount = TriangleRitem->Geo->DrawArgs["Square"].IndexCount;
-	TriangleRitem->StartIndexLocation = TriangleRitem->Geo->DrawArgs["Square"].StartIndexLocation;
-	TriangleRitem->BaseVertexLocation = TriangleRitem->Geo->DrawArgs["Square"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(TriangleRitem));
+	//球形的RenderItem
+	auto SphereRItem = std::make_unique<RenderItem>();
+	//存入世界矩阵
+	XMStoreFloat4x4(&SphereRItem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 2.0f));
+	SphereRItem->ObjCBIndex = 1;
+	SphereRItem->Geo = mGeometries["shapeGeo"].get();
+	SphereRItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SphereRItem->IndexCount = SphereRItem->Geo->DrawArgs["Sphere"].IndexCount;
+	SphereRItem->StartIndexLocation = SphereRItem->Geo->DrawArgs["Sphere"].StartIndexLocation;
+	SphereRItem->BaseVertexLocation = SphereRItem->Geo->DrawArgs["Sphere"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(SphereRItem));
+
+	//骷髅的RenderItem
+	auto SkullRItem = std::make_unique<RenderItem>();
+	//存入世界矩阵
+	XMStoreFloat4x4(&SkullRItem->World, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 0.0f, 2.0f));
+	//skull常量数据（world矩阵）在objConstantBuffer索引2上
+	SkullRItem->ObjCBIndex = 2;
+	SkullRItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SkullRItem->Geo = mGeometries["skullGeo"].get();
+	SkullRItem->IndexCount = SkullRItem->Geo->DrawArgs["skull"].IndexCount;
+	SkullRItem->BaseVertexLocation = SkullRItem->Geo->DrawArgs["skull"].BaseVertexLocation;
+	SkullRItem->StartIndexLocation = SkullRItem->Geo->DrawArgs["skull"].StartIndexLocation;
+	mAllRitems.push_back(std::move(SkullRItem));
 
 	// All the render items are opaque.
 	for (auto& e : mAllRitems)
@@ -525,7 +626,7 @@ void FirstApp::BuildPSO()
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	//暂时设置为不裁剪
-	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.SampleMask = UINT_MAX;
@@ -648,7 +749,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
 	try
 	{
-		FirstApp theApp(hInstance);
+		LightApp theApp(hInstance);
 		if (!theApp.Initialize())
 			return 0;
 

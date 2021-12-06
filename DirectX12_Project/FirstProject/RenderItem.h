@@ -29,6 +29,9 @@ struct RenderItem
 	// 暂时没发现有什么用，暂时先不管。
 	MeshGeometry* Geo = nullptr;
 
+	//渲染项所用材质
+	Material* Mat = nullptr;
+
 	//图元拓扑
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
