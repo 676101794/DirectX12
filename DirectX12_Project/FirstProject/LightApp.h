@@ -20,6 +20,7 @@ private:
 
 	virtual void UpdateObjectCBs(const GameTimer& gt) override;
 	virtual void UpdateMainPassCBs(const GameTimer& gt) override;
+	virtual void UpdateMaterialCBs(const GameTimer& gt) override;
 
 	//材质构建
 	void BuildMaterials();
@@ -30,11 +31,12 @@ private:
 	float mSunTheta = 1.25f * XM_PI;
 	float mSunPhi = XM_PIDIV4;
 
+	MaterialConstants matConstants;
+
 protected:
 	virtual void BuildSkullGeometry() override;
 
 	virtual void OnKeyboardInput(const GameTimer& gt) override;
 
 	virtual void BuildRootSignature() override;
-
 };

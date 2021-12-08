@@ -78,6 +78,7 @@ void FirstApp::Update(const GameTimer& gt)
 
 	UpdateObjectCBs(gt);
 	UpdateMainPassCBs(gt);
+	UpdateMaterialCBs(gt);
 }
 
 void FirstApp::Draw(const GameTimer& gt)
@@ -126,6 +127,17 @@ void FirstApp::Draw(const GameTimer& gt)
  	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
  	passCbvHandle.Offset(passCbvIndex, mCbvSrvUavDescriptorSize);
  	mCommandList->SetGraphicsRootDescriptorTable(0, passCbvHandle);
+
+	//暂时使用根描述符来设置材质的参数
+// 	auto matCB = mCurrFrameResource->MaterialCB->Resource();
+// 	D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress();
+// 	mCommandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
+
+	//设置材质参数位置。  
+	int MaterialCbvIndex = mMaterialCbvOffset + mCurrFrameResourceIndex;
+	auto MaterialCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+	MaterialCbvHandle.Offset(MaterialCbvIndex, mCbvSrvUavDescriptorSize);
+	mCommandList->SetGraphicsRootDescriptorTable(2, MaterialCbvHandle);
 
 	//绘制RenderItems
 	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
@@ -214,13 +226,13 @@ void FirstApp::BuildDescriptorHeaps()
 {
 	UINT objCount = (UINT)mOpaqueRitems.size();
 
-	// 建立描述符堆，描述堆的描述符容量为帧数*（每帧所需要绘制的物体数量+1），+1是因为每帧都还需要绘制一个passCB
-	UINT numDescriptors = (objCount + 1) * gNumFrameResources;
+	// 建立描述符堆，描述堆的描述符容量为帧数*（每帧所需要绘制的物体数量+1），+2是因为每帧都还需要绘制一个passCB和一个MaterialCB
+	UINT numDescriptors = (objCount + 2) * gNumFrameResources;
 
 	// 因为会首先建立ObjConstantBuffer，使用同一个描述符堆，PassConstantsBuffer会有一个偏移值。偏移值的量为ObjCount*gNumFrameResource;
-	// 然后再建立
+	// 然后再建立PassConstantBuffer，MaterialConstantsBuffer会有一个偏移值，偏移量gNumFrameResource;
 	mPassCbvOffset = objCount * gNumFrameResources;
-	mMaterialCbvOffset = mPassCbvOffset + 1;
+	mMaterialCbvOffset = mPassCbvOffset + gNumFrameResources;
 	
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
 	cbvHeapDesc.NumDescriptors = numDescriptors;
@@ -292,8 +304,19 @@ void FirstApp::BuildConstantBufferViews()
 	for(int frameIndex=0;frameIndex<gNumFrameResources;frameIndex++)
 	{
 		auto materialCB = mFrameResources[frameIndex]->MaterialCB->Resource();
+		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = materialCB->GetGPUVirtualAddress();
 
+		//因为每帧的MatCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
+		int heapIndex = mMaterialCbvOffset + frameIndex;
+		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
 
+		//在堆的该偏移上设置描述符
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+		cbvDesc.BufferLocation = cbAddress;
+		cbvDesc.SizeInBytes = matCBByteSize;
+
+		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
 	}
 }
 
@@ -725,6 +748,11 @@ void FirstApp::UpdateMainPassCBs(const GameTimer& gt)
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
+}
+
+void FirstApp::UpdateMaterialCBs(const GameTimer& gt)
+{
+
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,

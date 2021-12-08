@@ -257,9 +257,14 @@ struct Material
 	int NumFramesDirty = gNumFrameResources;
 
 	// Material constant buffer data used for shading.
+
+    //md漫反射反照率，决定了会反射多少光线出去。公式为 Bl*md*max(L · n，0) BL为入射光光量。
 	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 	DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
+
 	float Roughness = .25f;
+
 	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
 };
 

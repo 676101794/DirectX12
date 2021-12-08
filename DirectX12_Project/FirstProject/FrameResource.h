@@ -16,14 +16,15 @@ struct PassConstants
 {
 	XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
     XMFLOAT4 gPulseColor = XMFLOAT4(Colors::Green);
+	//环境光
+	XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
+    XMFLOAT3 gEyePos = { 0.0f, 0.0f, 0.0f };
     float gTimer;
-    //环境光
-    DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	// Indices [0, NUM_DIR_LIGHTS) are directional lights;
-    // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
-    // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
-    // are spot lights for a maximum of MaxLights per object.
+	// indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
+	// indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
+	// are spot lights for a maximum of MaxLights per object.
 	Light Lights[MaxLights];
 };
 

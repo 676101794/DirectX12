@@ -205,10 +205,18 @@ cbuffer cbPassObject : register(b1)
 
     float4x4 gViewProj;
     float4 gPulseColor;
+    float4 gAmbientLight;
+    float3 gEyePosW;
     float gTime;
+
+    // Indices [0, NUM_DIR_LIGHTS) are directional lights;
+    // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
+    // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
+    // are spot lights for a maximum of MaxLights per object.
+    Light gLights[MaxLights];
 }
 
-cbuffer cbMaterial : register(b2)
+cbuffer cbMatObject : register(b2)
 {
 	float4 gDiffuseAlbedo;
     float3 gFresnelR0;
@@ -224,7 +232,7 @@ struct VertexIn
 };
 
 //关于SV_POSITION : SV即System Value 
-//如果这个是绑定在从VS输出的数据结构上的话，意味着这个输出的数据结构包含了最终的转换过的，将用于光闪器的
+//如果这个是绑定在从VS输出的数据结构上的话，意味着这个输出的数据结构包含了最终的转换过的，将用于光栅器的
 struct VertexOut
 {
 	float4 PosH  : SV_POSITION;
@@ -238,10 +246,12 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout;
 
 	//vin.PosL.xy += 0.5f*sin(vin.PosL.x)*sin(3.0f*gTime);
-  	//vin.PosL.z *= 0.6f + 0.4f*sin(2.0f*gTime);
+    //vin.PosL.z *= 0.6f + 0.4f*sin(2.0f*gTime);
 	
+    // Indirect lighting. test
+    float4 ambient = gAmbientLight*gDiffuseAlbedo;
+
 	// Transform to homogeneous clip space.
-    
     float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
     vout.PosW = posW.xyz;
     
@@ -260,24 +270,32 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	// const float pi = 3.14159;
+        //测试在PixelShader里使用光照系统
 
-	// // 随着时间流逝，令正弦函数的值在[0,1]区间内周期性地变化
-	// float s = 0.5f*sin(2*gTimer - 0.25f*pi)+0.5f;
+    // Interpolating normal can unnormalize it, so renormalize it.
+    pin.NormalW = normalize(pin.NormalW);
 
-	// // 基于参数s 在pin.Color与gPulseColor之间进行线性插值
-	// float4 c = lerp(pin.Color, gPulseColor, s);
+    // Vector from point being lit to eye. 
+    float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
-    //return pin.Color;
-	//return c;
+	// Indirect lighting.
+    float4 ambient = gAmbientLight*gDiffuseAlbedo;
 
+    const float shininess = 1.0f - gRoughness;
+    Material mat = { gDiffuseAlbedo, gFresnelR0, shininess };
+    float3 shadowFactor = 1.0f;
+    float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
+        pin.NormalW, toEyeW, shadowFactor);
+
+    float4 litColor = ambient + directLight;
+
+    // Common convention to take alpha from diffuse material.
+    litColor.a = gDiffuseAlbedo.a;
+
+    return litColor;
+/* 
     const float pi = 3.14159;
 
-    // 随着时间流逝，令正弦函数的值在[0,1]区间内周期性地变化
-    //float s = 0.5f*sin(2*gTime - 0.25f*pi)+0.5f;
+    return pin.Color; */
 
-    // 基于参数s 在pin.Color与gPulseColor之间进行线性插值
-    //float4 c = lerp(pin.Color, gPulseColor, s);
-
-    return pin.Color;
 }

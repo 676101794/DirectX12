@@ -57,6 +57,7 @@ protected:
 	virtual void OnKeyboardInput(const GameTimer& gt);
 	virtual void UpdateObjectCBs(const GameTimer& gt);
 	virtual void UpdateMainPassCBs(const GameTimer& gt);
+	virtual void UpdateMaterialCBs(const GameTimer& gt);
 
 protected:
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
@@ -97,6 +98,7 @@ protected:
 
 	int mCurrFrameResourceIndex = 0;
 	FrameResource* mCurrFrameResource = nullptr;
+	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 
 private:
 	//纹理
@@ -108,6 +110,5 @@ private:
 	POINT mLastMousePos;
 
 	bool mIsWireframe = false;
-	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 
 };

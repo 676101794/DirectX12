@@ -61,7 +61,8 @@ void LightApp::BuildFrameResources()
 	for (int i = 0; i < gNumFrameResources; ++i)
 	{
 		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, (UINT)mAllRitems.size(), (UINT)mAllMaterials.size()));
+			1, (UINT)mAllRitems.size(), 1));
+		//(UINT)mAllMaterials.size()
 	}
 }
 
@@ -113,35 +114,37 @@ void LightApp::UpdateObjectCBs(const GameTimer& gt)
 void LightApp::UpdateMainPassCBs(const GameTimer& gt)
 {
 	// Convert Spherical to Cartesian coordinates.
-	float x = mRadius * sinf(mPhi) * cosf(mTheta);
-	float z = mRadius * sinf(mPhi) * sinf(mTheta);
-	float y = mRadius * cosf(mPhi);
+ 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
+ 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
+ 	float y = mRadius * cosf(mPhi);
+ 
+ 	// Build the view matrix.
+ 	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
+ 	XMVECTOR target = XMVectorZero();
+ 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+ 
+ 	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+ 	XMStoreFloat4x4(&mView, view);
 
-	// Build the view matrix.
-	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
-	XMVECTOR target = XMVectorZero();
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&mView, view);
-
-	XMMATRIX world = XMLoadFloat4x4(&mWorld);
-	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-	XMMATRIX worldViewProj = world * view * proj;
-
-	// Update the constant buffer with the latest worldViewProj matrix.
-	XMStoreFloat4x4(&mMainPassCB.WorldViewProj, XMMatrixTranspose(worldViewProj));
-	mMainPassCB.gTimer = gt.TotalTime();
-
-	//更新灯光
-	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
-	XMVECTOR lightDir = -MathHelper::SphericalToCartesian(1.0f, mSunTheta, mSunPhi);
-
-	XMStoreFloat3(&mMainPassCB.Lights[0].Direction, lightDir);
-	mMainPassCB.Lights[0].Strength = { 1.0f, 1.0f, 0.9f };
-
-	auto currPassCB = mCurrFrameResource->PassCB.get();
-	currPassCB->CopyData(0, mMainPassCB);
+	mMainPassCB.gEyePos = mEyePos;
+ 
+ 	XMMATRIX world = XMLoadFloat4x4(&mWorld);
+ 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
+ 	XMMATRIX worldViewProj = world * view * proj;
+ 
+ 	// Update the constant buffer with the latest worldViewProj matrix.
+ 	XMStoreFloat4x4(&mMainPassCB.WorldViewProj, XMMatrixTranspose(worldViewProj));
+ 	mMainPassCB.gTimer = gt.TotalTime();
+ 
+ 	//更新灯光
+ 	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
+ 	XMVECTOR lightDir = -MathHelper::SphericalToCartesian(1.0f, mSunTheta, mSunPhi);
+ 
+ 	XMStoreFloat3(&mMainPassCB.Lights[0].Direction, lightDir);
+ 	mMainPassCB.Lights[0].Strength = { 1.0f, 1.0f, 0.8f };
+ 
+ 	auto currPassCB = mCurrFrameResource->PassCB.get();
+ 	currPassCB->CopyData(0, mMainPassCB);
 }
 
 void LightApp::BuildMaterials()
@@ -191,7 +194,7 @@ void LightApp::BuildSkullGeometry()
 	{
 		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;//读取顶点坐标
 		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;//normal不读取
-		vertices[i].Color = XMFLOAT4(DirectX::Colors::CadetBlue);//设置顶点色
+		vertices[i].Color = XMFLOAT4(DirectX::Colors::Blue);//设置顶点色
 	}
 
 	fin >> ignore;
@@ -276,10 +279,14 @@ void LightApp::BuildRootSignature()
 	WorldObjectTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 	slotRootParameter[1].InitAsDescriptorTable(1, &WorldObjectTable);
 
+	//描述符表有问题，直接绑定描述符
+	
 	//用于描述材质 寄存器绑定为2
 	CD3DX12_DESCRIPTOR_RANGE MaterialTable;
 	MaterialTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2);
 	slotRootParameter[2].InitAsDescriptorTable(1, &MaterialTable);
+
+/*	slotRootParameter[2].InitAsConstantBufferView(2);*/
 
 	// A root signature is an array of root parameters.
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 0, nullptr,
@@ -303,4 +310,29 @@ void LightApp::BuildRootSignature()
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(&mRootSignature)));
+}
+
+void LightApp::UpdateMaterialCBs(const GameTimer& gt)
+{
+	auto currMaterialCB = mCurrFrameResource->MaterialCB.get();
+	for (auto& e : mAllMaterials)
+	{
+		// Only update the cbuffer data if the constants have changed.  If the cbuffer
+		// data changes, it needs to be updated for each FrameResource.
+		Material* mat = e.second.get();
+		if (mat->NumFramesDirty > 0)
+		{
+			XMMATRIX matTransform = XMLoadFloat4x4(&mat->MatTransform);
+
+			matConstants.DiffuseAlbedo = mat->DiffuseAlbedo;
+			matConstants.FresnelR0 = mat->FresnelR0;
+			matConstants.Roughness = mat->Roughness;
+
+			//currMaterialCB->CopyData(mat->MatCBIndex, matConstants);
+			currMaterialCB->CopyData(0, matConstants);
+
+			// Next FrameResource need to be updated too.
+			mat->NumFramesDirty--;
+		}
+	}
 }
