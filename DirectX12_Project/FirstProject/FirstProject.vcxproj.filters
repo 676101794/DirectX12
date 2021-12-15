@@ -60,6 +60,12 @@
     <ClCompile Include="LightApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="TextureApp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="WinMain.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MyDirectXFunctionLib.h">
@@ -105,6 +111,9 @@
       <Filter>头文件\ProjectFile</Filter>
     </ClInclude>
     <ClInclude Include="LightApp.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

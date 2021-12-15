@@ -61,7 +61,7 @@ void LightApp::BuildFrameResources()
 	for (int i = 0; i < gNumFrameResources; ++i)
 	{
 		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, (UINT)mAllRitems.size(), 1));
+			1, (UINT)mAllRitems.size(), (UINT)mAllMaterials.size()));
 		//(UINT)mAllMaterials.size()
 	}
 }
@@ -76,6 +76,7 @@ void LightApp::BuildRenderItems()
 	//Skull的ObjConstantIndex;
 	SkullRItem->ObjCBIndex = 0;
 	SkullRItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SkullRItem->Mat = mAllMaterials["grass"].get();
 	SkullRItem->Geo = mGeometries["skullGeo"].get();
 	SkullRItem->IndexCount = SkullRItem->Geo->DrawArgs["skull"].IndexCount;
 	SkullRItem->BaseVertexLocation = SkullRItem->Geo->DrawArgs["skull"].BaseVertexLocation;
@@ -94,10 +95,17 @@ void LightApp::UpdateObjectCBs(const GameTimer& gt)
 	//看需要有多少帧要更新这个东西
 	for (std::unique_ptr<RenderItem>& e : mAllRitems)
 	{
+		//先不做DirtyNumFrame的处理，每帧都进行世界坐标的更新
+
 		//更新常量缓冲区
-		if (e->NumFramesDirty > 0)
-		{
-			XMMATRIX world = XMLoadFloat4x4(&e->World);
+// 		if (e->NumFramesDirty > 0)
+// 		{
+			//XMMATRIX world = XMLoadFloat4x4(&e->World);
+
+			XMFLOAT4X4 NewFloat4x4;
+			XMStoreFloat4x4(&NewFloat4x4, XMMatrixScaling(0.2f, 0.2f, 0.2f) * XMMatrixTranslation(XOffset, YOffset, ZOffset));
+
+			XMMATRIX world = XMLoadFloat4x4(&NewFloat4x4);
 
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.WorldMatrix, XMMatrixTranspose(world));
@@ -106,8 +114,8 @@ void LightApp::UpdateObjectCBs(const GameTimer& gt)
 			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
 
 			//当前对象当前帧已经进行世界矩阵的拷贝。暂时每帧都进行拷贝
-			e->NumFramesDirty--;
-		}
+// 			e->NumFramesDirty--;
+// 		}
 	}
 }
 
@@ -141,7 +149,10 @@ void LightApp::UpdateMainPassCBs(const GameTimer& gt)
  	XMVECTOR lightDir = -MathHelper::SphericalToCartesian(1.0f, mSunTheta, mSunPhi);
  
  	XMStoreFloat3(&mMainPassCB.Lights[0].Direction, lightDir);
- 	mMainPassCB.Lights[0].Strength = { 1.0f, 1.0f, 0.8f };
+	//mMainPassCB.Lights[0].Strength = { 1.0f, 1.0f, 1.0f };
+
+	float value = sinf(gt.TotalTime() * 4.0f) * 0.5f + 0.5f;
+	mMainPassCB.Lights[0].Strength = { value * 2.0f + 1.0f, 1.0f, 1.0f };
  
  	auto currPassCB = mCurrFrameResource->PassCB.get();
  	currPassCB->CopyData(0, mMainPassCB);
@@ -152,8 +163,9 @@ void LightApp::BuildMaterials()
 	auto grass = std::make_unique<Material>();
 	grass->Name = "grass";
 	grass->MatCBIndex = 0;
-	grass->DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
-	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	//grass->DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
+	grass->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	grass->FresnelR0 = XMFLOAT3(0.5f, 0.5f, 0.5f);
 	grass->Roughness = 0.125f;
 
 	// This is not a good water material definition, but we do not have all the rendering
@@ -260,6 +272,24 @@ void LightApp::OnKeyboardInput(const GameTimer& gt)
 	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
 		mSunPhi += 1.0f * dt;
 
+	if (GetAsyncKeyState('D') & 0x8000)
+		XOffset += increment;
+
+	if (GetAsyncKeyState('A') & 0x8000)
+		XOffset -= increment;
+
+	if (GetAsyncKeyState('W') & 0x8000)
+		YOffset += increment;
+
+	if (GetAsyncKeyState('S') & 0x8000)
+		YOffset -= increment;
+
+	if (GetAsyncKeyState('Q') & 0x8000)
+		ZOffset += increment;
+
+	if (GetAsyncKeyState('Z') & 0x8000)
+		ZOffset -= increment;
+
 	mSunPhi = MathHelper::Clamp(mSunPhi, 0.1f, XM_PIDIV2);
 }
 
@@ -269,24 +299,30 @@ void LightApp::BuildRootSignature()
 
 	//第一个根参数用于存放各种需要经常变化的参数。
 	// Create a single descriptor table of CBVs.
-	CD3DX12_DESCRIPTOR_RANGE PassObjectTable;
-	//第三个参数为要绑定的寄存器，没有显示地指定则直接为0
-	PassObjectTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-	slotRootParameter[0].InitAsDescriptorTable(1, &PassObjectTable);
+// 	CD3DX12_DESCRIPTOR_RANGE PassObjectTable;
+// 	//第三个参数为要绑定的寄存器，没有显示地指定则直接为0
+// 	PassObjectTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
+// 	slotRootParameter[0].InitAsDescriptorTable(1, &PassObjectTable);
+
+	//使用描述符用于根参数
+	slotRootParameter[0].InitAsConstantBufferView(1);
 
 	//用于描述世界矩阵  寄存器绑定为0
-	CD3DX12_DESCRIPTOR_RANGE WorldObjectTable;
-	WorldObjectTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	slotRootParameter[1].InitAsDescriptorTable(1, &WorldObjectTable);
+// 	CD3DX12_DESCRIPTOR_RANGE WorldObjectTable;
+// 	WorldObjectTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+// 	slotRootParameter[1].InitAsDescriptorTable(1, &WorldObjectTable);
+	
+	slotRootParameter[1].InitAsConstantBufferView(0);
 
 	//描述符表有问题，直接绑定描述符
 	
 	//用于描述材质 寄存器绑定为2
-	CD3DX12_DESCRIPTOR_RANGE MaterialTable;
-	MaterialTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2);
-	slotRootParameter[2].InitAsDescriptorTable(1, &MaterialTable);
+// 	CD3DX12_DESCRIPTOR_RANGE MaterialTable;
+// 	MaterialTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2);
+// 	slotRootParameter[2].InitAsDescriptorTable(1, &MaterialTable);
 
-/*	slotRootParameter[2].InitAsConstantBufferView(2);*/
+	//使用描述符作为根参数
+	slotRootParameter[2].InitAsConstantBufferView(2);
 
 	// A root signature is an array of root parameters.
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 0, nullptr,
@@ -312,6 +348,85 @@ void LightApp::BuildRootSignature()
 		IID_PPV_ARGS(&mRootSignature)));
 }
 
+void LightApp::BuildConstantBufferViews()
+{
+	//创建描述符  PassCB的描述符 ObjectCB的描述符 MaterialCB的描述符
+
+	//根据多少帧，以及每帧需要绘制的物体，来创建描述符！
+// 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+// 
+// 	UINT objCount = (UINT)mOpaqueRitems.size();
+// 
+// 	for (int frameIndex = 0; frameIndex < gNumFrameResources; ++frameIndex)
+// 	{
+// 		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
+// 
+// 		for (UINT i = 0; i < objCount; ++i)
+// 		{
+// 			//获取到当前帧的常量缓冲区的GPU地址
+// 			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
+// 
+// 			//偏移到第i个对象的常量缓存区地址
+// 			cbAddress += i * objCBByteSize;
+// 
+// 			//计算出在描述符堆中的偏移。
+// 			int heapIndex = frameIndex * objCount + i;
+// 			auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+// 			handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
+// 
+// 			//在该偏移处创建描述符
+// 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+// 			cbvDesc.BufferLocation = cbAddress;
+// 			cbvDesc.SizeInBytes = objCBByteSize;
+// 
+// 			md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+// 		}
+// 	}
+
+	//计算passCB的大小
+// 	UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+// 
+// 	for (int frameIndex = 0; frameIndex < gNumFrameResources; frameIndex++)
+// 	{
+// 		auto passCB = mFrameResources[frameIndex]->PassCB->Resource();
+// 		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = passCB->GetGPUVirtualAddress();
+// 
+// 		//因为每帧的PassCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
+// 		int heapIndex = mPassCbvOffset + frameIndex;
+// 		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+// 		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
+// 
+// 		//在堆的该偏移上设置描述符
+// 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+// 		cbvDesc.BufferLocation = cbAddress;
+// 		cbvDesc.SizeInBytes = passCBByteSize;
+// 
+// 		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+// 	}
+
+	//计算MaterialCB的大小
+// 	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+// 	for (int frameIndex = 0; frameIndex < gNumFrameResources; frameIndex++)
+// 	{
+// 		auto materialCB = mFrameResources[frameIndex]->MaterialCB->Resource();
+// 		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = materialCB->GetGPUVirtualAddress();
+// 
+// 		//因为每帧的MatCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
+// 		int heapIndex = mMaterialCbvOffset + frameIndex;
+// 		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+// 		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
+// 
+// 		//在堆的该偏移上设置描述符
+// 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+// 		cbvDesc.BufferLocation = cbAddress;
+// 		cbvDesc.SizeInBytes = matCBByteSize;
+// 
+// 		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+// 	}
+
+
+}
+
 void LightApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = mCurrFrameResource->MaterialCB.get();
@@ -328,8 +443,7 @@ void LightApp::UpdateMaterialCBs(const GameTimer& gt)
 			matConstants.FresnelR0 = mat->FresnelR0;
 			matConstants.Roughness = mat->Roughness;
 
-			//currMaterialCB->CopyData(mat->MatCBIndex, matConstants);
-			currMaterialCB->CopyData(0, matConstants);
+			currMaterialCB->CopyData(mat->MatCBIndex, matConstants);
 
 			// Next FrameResource need to be updated too.
 			mat->NumFramesDirty--;

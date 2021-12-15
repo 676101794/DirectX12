@@ -258,12 +258,14 @@ struct Material
 
 	// Material constant buffer data used for shading.
 
-    //md漫反射反照率，决定了会反射多少光线出去。公式为 Bl*md*max(L · n，0) BL为入射光光量。
+    //md漫反射反照率，决定了会反射多少光线出去。公式为 Bl*md*max(L · n，0) BL为入射光光量。用于漫反射光照 
 	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+    //这个是反射光亮，即Rf(0°)，用于镜面反射光照，此为视线角度与法线为0度时的反射率
 	DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
 
-	float Roughness = .25f;
+    //粗糙度，用于反射光照，通常，粗糙度越高，镜面瓣越宽，光能传播越广，越低，镜面瓣越窄，高光会更明显。
+	float Roughness = 0.25f;
 
 	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
 };

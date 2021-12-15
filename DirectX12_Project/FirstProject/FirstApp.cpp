@@ -2,6 +2,7 @@
 #include "RenderItem.h"
 #include "GeometryGenerator.h"
 #include "LightApp.h"
+#include "TextureApp.h"
 //#include <DirectXColors.h>
 
 //这儿为啥放在.h文件会出问题。
@@ -123,21 +124,17 @@ void FirstApp::Draw(const GameTimer& gt)
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
- 	int passCbvIndex = mPassCbvOffset + mCurrFrameResourceIndex;
- 	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
- 	passCbvHandle.Offset(passCbvIndex, mCbvSrvUavDescriptorSize);
- 	mCommandList->SetGraphicsRootDescriptorTable(0, passCbvHandle);
+	//使用根描述符设置PassCB参数
+	UINT PassCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+	auto PassCB = mCurrFrameResource->PassCB->Resource();
+	D3D12_GPU_VIRTUAL_ADDRESS PassCBAddress = PassCB->GetGPUVirtualAddress() + 0 * PassCBByteSize;
+	mCommandList->SetGraphicsRootConstantBufferView(0,PassCBAddress);
 
-	//暂时使用根描述符来设置材质的参数
-// 	auto matCB = mCurrFrameResource->MaterialCB->Resource();
-// 	D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress();
-// 	mCommandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
-
-	//设置材质参数位置。  
-	int MaterialCbvIndex = mMaterialCbvOffset + mCurrFrameResourceIndex;
-	auto MaterialCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
-	MaterialCbvHandle.Offset(MaterialCbvIndex, mCbvSrvUavDescriptorSize);
-	mCommandList->SetGraphicsRootDescriptorTable(2, MaterialCbvHandle);
+	//使用根描述符可以更直接地设置参数
+	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+	auto matCB = mCurrFrameResource->MaterialCB->Resource();
+	D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + 0 * matCBByteSize;
+	mCommandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
 
 	//绘制RenderItems
 	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
@@ -183,7 +180,7 @@ void FirstApp::OnMouseMove(WPARAM btnState, int x, int y)
 	if ((btnState & MK_LBUTTON) != 0)
 	{
 		// Make each pixel correspond to a quarter of a degree.
-		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
+		float dx =  (0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
 		// Update angles based on input to orbit camera around box.
@@ -227,12 +224,12 @@ void FirstApp::BuildDescriptorHeaps()
 	UINT objCount = (UINT)mOpaqueRitems.size();
 
 	// 建立描述符堆，描述堆的描述符容量为帧数*（每帧所需要绘制的物体数量+1），+2是因为每帧都还需要绘制一个passCB和一个MaterialCB
-	UINT numDescriptors = (objCount + 2) * gNumFrameResources;
+	UINT numDescriptors = (objCount + 1) * gNumFrameResources;
 
 	// 因为会首先建立ObjConstantBuffer，使用同一个描述符堆，PassConstantsBuffer会有一个偏移值。偏移值的量为ObjCount*gNumFrameResource;
 	// 然后再建立PassConstantBuffer，MaterialConstantsBuffer会有一个偏移值，偏移量gNumFrameResource;
 	mPassCbvOffset = objCount * gNumFrameResources;
-	mMaterialCbvOffset = mPassCbvOffset + gNumFrameResources;
+	//mMaterialCbvOffset = mPassCbvOffset + gNumFrameResources;
 	
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
 	cbvHeapDesc.NumDescriptors = numDescriptors;
@@ -295,26 +292,6 @@ void FirstApp::BuildConstantBufferViews()
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
 		cbvDesc.BufferLocation = cbAddress;
 		cbvDesc.SizeInBytes = passCBByteSize;
-
-		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
-	}
-
-	//计算MaterialCB的大小
-	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
-	for(int frameIndex=0;frameIndex<gNumFrameResources;frameIndex++)
-	{
-		auto materialCB = mFrameResources[frameIndex]->MaterialCB->Resource();
-		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = materialCB->GetGPUVirtualAddress();
-
-		//因为每帧的MatCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
-		int heapIndex = mMaterialCbvOffset + frameIndex;
-		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
-
-		//在堆的该偏移上设置描述符
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-		cbvDesc.BufferLocation = cbAddress;
-		cbvDesc.SizeInBytes = matCBByteSize;
 
 		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
 	}
@@ -432,7 +409,7 @@ void FirstApp::BuildBoxGeometry()
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);//geoGen.CreateSphere(50.0f, 20, 20);
 	UINT SphereVertexOffset = SquareVertexOffset + (UINT)SquareVertices.size();
-	UINT SphereIndexOffset= SquareIndexOffset + (UINT)SquareIndices.size();
+	UINT SphereIndexOffset = SquareIndexOffset + (UINT)SquareIndices.size();
 
 	SubmeshGeometry SphereSubmesh;
 	SphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
@@ -630,13 +607,19 @@ void FirstApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 		cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
-		//偏移到缓冲区此物体常量的地址
-		UINT cbvIndex = mCurrFrameResourceIndex * (UINT)mOpaqueRitems.size() + ri->ObjCBIndex;
-		auto cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
-		cbvHandle.Offset(cbvIndex, mCbvSrvUavDescriptorSize);
+// 		//偏移到缓冲区此物体常量的地址
+// 		UINT cbvIndex = mCurrFrameResourceIndex * (UINT)mOpaqueRitems.size() + ri->ObjCBIndex;
+// 		auto cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+// 		cbvHandle.Offset(cbvIndex, mCbvSrvUavDescriptorSize);
+// 
+// 		//给根描述符的参数进行赋值填充
+// 		cmdList->SetGraphicsRootDescriptorTable(1, cbvHandle);
 
-		//给根描述符的参数进行赋值填充
-		cmdList->SetGraphicsRootDescriptorTable(1, cbvHandle);
+		//使用根描述符可以更直接地设置参数
+		UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+		auto objCB = mCurrFrameResource->ObjectCB->Resource();
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objCB->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize;
+		mCommandList->SetGraphicsRootConstantBufferView(1, objCBAddress);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
@@ -753,27 +736,4 @@ void FirstApp::UpdateMainPassCBs(const GameTimer& gt)
 void FirstApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 
-}
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
-	PSTR cmdLine, int showCmd)
-{
-	// Enable run-time memory check for debug builds.
-#if defined(DEBUG) | defined(_DEBUG)
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
-
-	try
-	{
-		LightApp theApp(hInstance);
-		if (!theApp.Initialize())
-			return 0;
-
-		return theApp.Run();
-	}
-	catch (DxException& e)
-	{
-		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
-		return 0;
-	}
 }

@@ -14,6 +14,7 @@ namespace MyApp
 		XMFLOAT3 Pos;
 		XMFLOAT4 Color;
 		XMFLOAT3 Normal;
+		XMFLOAT2 Texc;
 	};
 }
 
@@ -41,10 +42,10 @@ protected:
 	virtual void BuildRenderItems();
 	virtual void BuildSkullGeometry();
 	virtual void BuildRootSignature();
+	virtual void LoadTextures();
+	virtual void BuildConstantBufferViews();
+	virtual void BuildDescriptorHeaps();
 
-	void LoadTextures();
-	void BuildDescriptorHeaps();
-	void BuildConstantBufferViews();
 	void BuildBoxGeometry();
 
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
@@ -65,6 +66,8 @@ protected:
 	std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
 	//几何体的映射
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> mGeometries;
+	//纹理
+	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 	//堆描述符
 	ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
 
@@ -101,8 +104,6 @@ protected:
 	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 
 private:
-	//纹理
-	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 
 	//管线状态对象
 	ComPtr<ID3D12PipelineState> mPSO = nullptr;

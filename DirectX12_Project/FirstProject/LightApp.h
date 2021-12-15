@@ -35,8 +35,14 @@ private:
 
 protected:
 	virtual void BuildSkullGeometry() override;
-
 	virtual void OnKeyboardInput(const GameTimer& gt) override;
-
 	virtual void BuildRootSignature() override;
+	virtual void BuildConstantBufferViews() override;
+
+private:
+	float XOffset = 0;
+	float YOffset = 0;
+	float ZOffset = 0;
+
+	float increment = 0.01f;
 };

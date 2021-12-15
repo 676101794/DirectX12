@@ -31,7 +31,9 @@
     <ClCompile Include="LightApp.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="MyDirectXFunctionLib.cpp" />
+    <ClCompile Include="TextureApp.cpp" />
     <ClCompile Include="TextureLoadClassApp.cpp" />
+    <ClCompile Include="WinMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -47,6 +49,7 @@
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="MyDirectXFunctionLib.h" />
     <ClInclude Include="RenderItem.h" />
+    <ClInclude Include="TextureApp.h" />
     <ClInclude Include="TextureLoadClassApp.h" />
     <ClInclude Include="UploadBuffer.h" />
   </ItemGroup>
