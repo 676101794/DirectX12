@@ -119,8 +119,7 @@ void FirstApp::Draw(const GameTimer& gt)
 	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(),
 		true, &DepthStencilView());
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
-	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	//描述符堆不一定要必须指定。
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
@@ -130,11 +129,8 @@ void FirstApp::Draw(const GameTimer& gt)
 	D3D12_GPU_VIRTUAL_ADDRESS PassCBAddress = PassCB->GetGPUVirtualAddress() + 0 * PassCBByteSize;
 	mCommandList->SetGraphicsRootConstantBufferView(0,PassCBAddress);
 
-	//使用根描述符可以更直接地设置参数
-	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
-	auto matCB = mCurrFrameResource->MaterialCB->Resource();
-	D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + 0 * matCBByteSize;
-	mCommandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
+	//设置材质的根
+	SetMaterialParamater();
 
 	//绘制RenderItems
 	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
@@ -240,61 +236,98 @@ void FirstApp::BuildDescriptorHeaps()
 		IID_PPV_ARGS(&mCbvHeap)));
 }
 
+void FirstApp::BuildMaterials()
+{
+	auto grass = std::make_unique<Material>();
+	grass->Name = "grass";
+	grass->MatCBIndex = 0;
+	//grass->DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
+	grass->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	grass->FresnelR0 = XMFLOAT3(0.5f, 0.5f, 0.5f);
+	grass->Roughness = 0.125f;
+
+	// This is not a good water material definition, but we do not have all the rendering
+	// tools we need (transparency, environment reflection), so we fake it for now.
+	auto water = std::make_unique<Material>();
+	water->Name = "water";
+	water->MatCBIndex = 1;
+	water->DiffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
+	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	water->Roughness = 0.0f;
+
+	auto woodCrate = std::make_unique<Material>();
+	woodCrate->Name = "woodCrate";
+	woodCrate->MatCBIndex = 0;
+	woodCrate->DiffuseSrvHeapIndex = 0;
+	woodCrate->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	woodCrate->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	woodCrate->Roughness = 0.2f;
+
+	mAllMaterials["woodCrate"] = std::move(woodCrate);
+	mAllMaterials["grass"] = std::move(grass);
+	mAllMaterials["water"] = std::move(water);
+}
+
+void FirstApp::SetMaterialParamater()
+{
+
+}
+
 void FirstApp::BuildConstantBufferViews()
 {
 	//创建描述符  PassCB的描述符 ObjectCB的描述符 MaterialCB的描述符
 
 	//根据多少帧，以及每帧需要绘制的物体，来创建描述符！
-	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-
-	UINT objCount = (UINT)mOpaqueRitems.size();
-
-	for(int frameIndex=0; frameIndex < gNumFrameResources; ++frameIndex)
-	{
-		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
-
-		for(UINT i=0;i<objCount;++i)
-		{
-			//获取到当前帧的常量缓冲区的GPU地址
-			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
-
-			//偏移到第i个对象的常量缓存区地址
-			cbAddress += i * objCBByteSize;
-
-			//计算出在描述符堆中的偏移。
-			int heapIndex = frameIndex * objCount + i;
-			auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-			handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
-
-			//在该偏移处创建描述符
-			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-			cbvDesc.BufferLocation = cbAddress;
-			cbvDesc.SizeInBytes = objCBByteSize;
-
-			md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
-		}
-	}
-
-	//计算passCB的大小
-	UINT passCBByteSize= d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
-
-	for(int frameIndex=0;frameIndex<gNumFrameResources;frameIndex++)
-	{
-		auto passCB = mFrameResources[frameIndex]->PassCB->Resource();
-		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = passCB->GetGPUVirtualAddress();
-
-		//因为每帧的PassCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
-		int heapIndex = mPassCbvOffset + frameIndex;
-		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
-
-		//在堆的该偏移上设置描述符
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-		cbvDesc.BufferLocation = cbAddress;
-		cbvDesc.SizeInBytes = passCBByteSize;
-
-		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
-	}
+// 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+// 
+// 	UINT objCount = (UINT)mOpaqueRitems.size();
+// 
+// 	for(int frameIndex=0; frameIndex < gNumFrameResources; ++frameIndex)
+// 	{
+// 		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
+// 
+// 		for(UINT i=0;i<objCount;++i)
+// 		{
+// 			//获取到当前帧的常量缓冲区的GPU地址
+// 			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
+// 
+// 			//偏移到第i个对象的常量缓存区地址
+// 			cbAddress += i * objCBByteSize;
+// 
+// 			//计算出在描述符堆中的偏移。
+// 			int heapIndex = frameIndex * objCount + i;
+// 			auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+// 			handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
+// 
+// 			//在该偏移处创建描述符
+// 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+// 			cbvDesc.BufferLocation = cbAddress;
+// 			cbvDesc.SizeInBytes = objCBByteSize;
+// 
+// 			md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+// 		}
+// 	}
+// 
+// 	//计算passCB的大小
+// 	UINT passCBByteSize= d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+// 
+// 	for(int frameIndex=0;frameIndex<gNumFrameResources;frameIndex++)
+// 	{
+// 		auto passCB = mFrameResources[frameIndex]->PassCB->Resource();
+// 		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = passCB->GetGPUVirtualAddress();
+// 
+// 		//因为每帧的PassCB都一样，而不需要像ObjectConstantBuffer一样针对每个物体都进行处理。所以只需要对帧进行偏移。
+// 		int heapIndex = mPassCbvOffset + frameIndex;
+// 		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+// 		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
+// 
+// 		//在堆的该偏移上设置描述符
+// 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+// 		cbvDesc.BufferLocation = cbAddress;
+// 		cbvDesc.SizeInBytes = passCBByteSize;
+// 
+// 		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+// 	}
 }
 
 void FirstApp::BuildRootSignature()
@@ -306,13 +339,18 @@ void FirstApp::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE cbvTable;
 
 	//第三个参数为要绑定的寄存器，没有显示地指定则直接为0
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+// 	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
+// 	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+// 
+// 	//用于描述世界矩阵  寄存器绑定为0
+// 	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
+// 	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+// 	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
 
-	//用于描述世界矩阵  寄存器绑定为0
-	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
-	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
+	//使用描述符用于根参数
+	slotRootParameter[0].InitAsConstantBufferView(1);
+
+	slotRootParameter[1].InitAsConstantBufferView(0);
 
 	// A root signature is an array of root parameters.
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
@@ -406,17 +444,17 @@ void FirstApp::BuildBoxGeometry()
 	SquareSubMesh.BaseVertexLocation = SquareIndexOffset;
 
 	//通过GeometryGenerator创建球形
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);//geoGen.CreateSphere(50.0f, 20, 20);
-	UINT SphereVertexOffset = SquareVertexOffset + (UINT)SquareVertices.size();
-	UINT SphereIndexOffset = SquareIndexOffset + (UINT)SquareIndices.size();
+// 	GeometryGenerator geoGen;
+// 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);//geoGen.CreateSphere(50.0f, 20, 20);
+// 	UINT SphereVertexOffset = SquareVertexOffset + (UINT)SquareVertices.size();
+// 	UINT SphereIndexOffset = SquareIndexOffset + (UINT)SquareIndices.size();
 
-	SubmeshGeometry SphereSubmesh;
-	SphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
-	SphereSubmesh.StartIndexLocation = SphereIndexOffset;
-	SphereSubmesh.BaseVertexLocation = SphereVertexOffset;
+// 	SubmeshGeometry SphereSubmesh;
+// 	SphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+// 	SphereSubmesh.StartIndexLocation = SphereIndexOffset;
+// 	SphereSubmesh.BaseVertexLocation = SphereVertexOffset;
 
-	auto totalVertexCount = sphere.Vertices.size() + SquareVertices.size();
+	auto totalVertexCount = SquareVertices.size();
 	std::vector<MyApp::Vertex> vertices(totalVertexCount);
 	UINT k = 0;
 	for(size_t i=0;i<SquareVertices.size();i++,k++)
@@ -424,15 +462,9 @@ void FirstApp::BuildBoxGeometry()
 		vertices[k].Pos = SquareVertices[i].Pos;
 		vertices[k].Color = SquareVertices[i].Color;
 	}
-	for(size_t i=0;i<sphere.Vertices.size();i++,k++)
-	{
-		vertices[k].Pos = sphere.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::Green);
-	}
 
 	std::vector<std::uint16_t> indices;
 	indices.insert(indices.end(),std::begin(SquareIndices),std::end(SquareIndices));
-	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(MyApp::Vertex);
 	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
@@ -458,7 +490,6 @@ void FirstApp::BuildBoxGeometry()
 	geo->IndexBufferByteSize = ibByteSize;
 
 	geo->DrawArgs["Square"] = SquareSubMesh;
-	geo->DrawArgs["Sphere"] = SphereSubmesh;
 
 	mGeometries[geo->Name] = std::move(geo);
 }
@@ -551,7 +582,7 @@ void FirstApp::BuildRenderItems()
 {
 	auto SquareRitem = std::make_unique<RenderItem>();
 	//存入世界矩阵
-	XMStoreFloat4x4(&SquareRitem->World, XMMatrixScaling(0.1f, 0.1f, 0.1f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+	XMStoreFloat4x4(&SquareRitem->World, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
 	SquareRitem->ObjCBIndex = 0;
 	SquareRitem->Geo = mGeometries["shapeGeo"].get();
 	SquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -561,16 +592,16 @@ void FirstApp::BuildRenderItems()
 	mAllRitems.push_back(std::move(SquareRitem));
 
 	//球形的RenderItem
-	auto SphereRItem = std::make_unique<RenderItem>();
-	//存入世界矩阵
-	XMStoreFloat4x4(&SphereRItem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 2.0f));
-	SphereRItem->ObjCBIndex = 1;
-	SphereRItem->Geo = mGeometries["shapeGeo"].get();
-	SphereRItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	SphereRItem->IndexCount = SphereRItem->Geo->DrawArgs["Sphere"].IndexCount;
-	SphereRItem->StartIndexLocation = SphereRItem->Geo->DrawArgs["Sphere"].StartIndexLocation;
-	SphereRItem->BaseVertexLocation = SphereRItem->Geo->DrawArgs["Sphere"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(SphereRItem));
+// 	auto SphereRItem = std::make_unique<RenderItem>();
+// 	//存入世界矩阵
+// 	XMStoreFloat4x4(&SphereRItem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 2.0f));
+// 	SphereRItem->ObjCBIndex = 1;
+// 	SphereRItem->Geo = mGeometries["shapeGeo"].get();
+// 	SphereRItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+// 	SphereRItem->IndexCount = SphereRItem->Geo->DrawArgs["Sphere"].IndexCount;
+// 	SphereRItem->StartIndexLocation = SphereRItem->Geo->DrawArgs["Sphere"].StartIndexLocation;
+// 	SphereRItem->BaseVertexLocation = SphereRItem->Geo->DrawArgs["Sphere"].BaseVertexLocation;
+// 	mAllRitems.push_back(std::move(SphereRItem));
 
 	//骷髅的RenderItem
 	auto SkullRItem = std::make_unique<RenderItem>();
@@ -583,7 +614,7 @@ void FirstApp::BuildRenderItems()
 	SkullRItem->IndexCount = SkullRItem->Geo->DrawArgs["skull"].IndexCount;
 	SkullRItem->BaseVertexLocation = SkullRItem->Geo->DrawArgs["skull"].BaseVertexLocation;
 	SkullRItem->StartIndexLocation = SkullRItem->Geo->DrawArgs["skull"].StartIndexLocation;
-	mAllRitems.push_back(std::move(SkullRItem));
+	//mAllRitems.push_back(std::move(SkullRItem));
 
 	// All the render items are opaque.
 	for (auto& e : mAllRitems)

@@ -11,7 +11,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
 	try
 	{
-		FirstApp theApp(hInstance);
+		TextureApp theApp(hInstance);
 		if (!theApp.Initialize())
 			return 0;
 

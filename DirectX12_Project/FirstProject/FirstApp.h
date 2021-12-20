@@ -45,10 +45,13 @@ protected:
 	virtual void LoadTextures();
 	virtual void BuildConstantBufferViews();
 	virtual void BuildDescriptorHeaps();
+	virtual void BuildMaterials();
 
-	void BuildBoxGeometry();
+	virtual void SetMaterialParamater();
 
-	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+	virtual void BuildBoxGeometry();
+
+	virtual void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
 	//Pipeline State Object
 	void BuildPSO();
@@ -70,6 +73,10 @@ protected:
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 	//堆描述符
 	ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
+	//ShaderResource
+	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
+
+	std::unordered_map<std::string, std::unique_ptr<Material>> mAllMaterials;
 
 	//输入布局的
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
@@ -77,6 +84,10 @@ protected:
 	float mRadius = 5.0f;
 	float mPhi = XM_PIDIV4;
 	float mTheta = 1.5f * XM_PI;
+	MaterialConstants matConstants;
+
+	float mSunTheta = 1.25f * XM_PI;
+	float mSunPhi = XM_PIDIV4;
 
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	XMFLOAT4X4 mWorld = MathHelper::Identity4x4();
@@ -103,10 +114,11 @@ protected:
 	FrameResource* mCurrFrameResource = nullptr;
 	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 
-private:
-
 	//管线状态对象
 	ComPtr<ID3D12PipelineState> mPSO = nullptr;
+
+private:
+
 
 	POINT mLastMousePos;
 

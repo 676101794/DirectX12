@@ -10,6 +10,7 @@ using namespace DirectX;
 struct ObjectConstants
 {
 	XMFLOAT4X4 WorldMatrix = MathHelper::Identity4x4();
+    XMFLOAT4X4 gTexTransform = MathHelper::Identity4x4();
 };
 
 struct PassConstants

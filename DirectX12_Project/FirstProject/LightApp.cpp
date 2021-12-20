@@ -23,6 +23,7 @@ bool LightApp::Initialize()
 
 	BuildMaterials();
 	BuildRootSignature();
+	BuildBoxGeometry();
 	BuildShadersAndInputLayout();
 	BuildSkullGeometry();
 	BuildRenderItems();
@@ -95,7 +96,7 @@ void LightApp::UpdateObjectCBs(const GameTimer& gt)
 	//看需要有多少帧要更新这个东西
 	for (std::unique_ptr<RenderItem>& e : mAllRitems)
 	{
-		//先不做DirtyNumFrame的处理，每帧都进行世界坐标的更新
+		//先不做DirtyNumFrame的处理，每帧都进行世界坐标的更新，用于做按键的控制
 
 		//更新常量缓冲区
 // 		if (e->NumFramesDirty > 0)
@@ -156,29 +157,6 @@ void LightApp::UpdateMainPassCBs(const GameTimer& gt)
  
  	auto currPassCB = mCurrFrameResource->PassCB.get();
  	currPassCB->CopyData(0, mMainPassCB);
-}
-
-void LightApp::BuildMaterials()
-{
-	auto grass = std::make_unique<Material>();
-	grass->Name = "grass";
-	grass->MatCBIndex = 0;
-	//grass->DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
-	grass->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-	grass->FresnelR0 = XMFLOAT3(0.5f, 0.5f, 0.5f);
-	grass->Roughness = 0.125f;
-
-	// This is not a good water material definition, but we do not have all the rendering
-	// tools we need (transparency, environment reflection), so we fake it for now.
-	auto water = std::make_unique<Material>();
-	water->Name = "water";
-	water->MatCBIndex = 1;
-	water->DiffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
-	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->Roughness = 0.0f;
-
-	mAllMaterials["grass"] = std::move(grass);
-	mAllMaterials["water"] = std::move(water);
 }
 
 void LightApp::BuildSkullGeometry()
@@ -425,6 +403,14 @@ void LightApp::BuildConstantBufferViews()
 // 	}
 
 
+}
+
+void LightApp::SetMaterialParamater()
+{
+ 	UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+ 	auto matCB = mCurrFrameResource->MaterialCB->Resource();
+ 	D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + 0 * matCBByteSize;
+ 	mCommandList->SetGraphicsRootConstantBufferView(2, matCBAddress);
 }
 
 void LightApp::UpdateMaterialCBs(const GameTimer& gt)
